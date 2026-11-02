@@ -6,7 +6,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
-import org.w3c.dom.Element
 import java.net.URI
 import java.net.URLDecoder
 
@@ -196,47 +195,9 @@ class StreamResolver(private val http: HttpFetcher) {
 
         /** RSS 2.0 (podcast) and Atom feeds; newest entries first as published. */
         fun parseFeed(xml: String): List<PlayableItem> {
-            val doc = runCatching { Xml.parse(xml) }.getOrNull() ?: return emptyList()
-            val channelImage = doc.getElementsByTagName("itunes:image").let {
-                if (it.length > 0) (it.item(0) as Element).getAttribute("href").ifEmpty { null } else null
-            }
-            val showTitle = doc.getElementsByTagName("channel").let {
-                if (it.length > 0) childText(it.item(0) as Element, "title") else null
-            }
-            val result = mutableListOf<PlayableItem>()
-            for (tag in listOf("item", "entry")) {
-                val nodes = doc.getElementsByTagName(tag)
-                for (i in 0 until nodes.length) {
-                    val item = nodes.item(i) as Element
-                    val enclosure = firstChild(item, "enclosure")?.getAttribute("url")?.ifEmpty { null }
-                        ?: childElements(item, "link").firstOrNull { it.getAttribute("rel") == "enclosure" }?.getAttribute("href")
-                        ?: continue
-                    val image = firstChild(item, "itunes:image")?.getAttribute("href")?.ifEmpty { null } ?: channelImage
-                    result += PlayableItem(
-                        title = childText(item, "title") ?: fileTitle(enclosure),
-                        url = enclosure,
-                        kind = StreamKind.EPISODE,
-                        subtitle = showTitle,
-                        artUrl = image,
-                    )
-                    if (result.size >= MAX_ITEMS) return result
-                }
-            }
-            return result
+            val feed = PodcastService.parseFeed(xml, "") ?: return emptyList()
+            return feed.episodes.take(MAX_ITEMS).map { it.toItem(feed.podcast.title) }
         }
-
-        private fun childElements(parent: Element, name: String): List<Element> {
-            val out = mutableListOf<Element>()
-            val nodes = parent.childNodes
-            for (i in 0 until nodes.length) {
-                val n = nodes.item(i)
-                if (n is Element && n.tagName == name) out += n
-            }
-            return out
-        }
-
-        private fun firstChild(parent: Element, name: String) = childElements(parent, name).firstOrNull()
-        private fun childText(parent: Element, name: String) = firstChild(parent, name)?.textContent?.trim()?.ifEmpty { null }
 
         /** Finds audio on a web page: OpenGraph/Twitter tags, JSON-LD, <audio> tags and any linked audio file. */
         fun parseHtml(html: String, pageUrl: String, fallbackTitle: String?): List<PlayableItem> {

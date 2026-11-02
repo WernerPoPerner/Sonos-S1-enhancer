@@ -10,11 +10,12 @@ import de.sonoss1.app.ui.S1Theme
 
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels { MainViewModel.factory((application as SonosApp).repository) }
+    private val podcastVm: PodcastViewModel by viewModels { PodcastViewModel.factory((application as SonosApp).repository) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { S1Theme { MainScreen(vm) } }
+        setContent { S1Theme { MainScreen(vm, podcastVm) } }
     }
 
     override fun onStart() {

@@ -23,6 +23,26 @@ abspielen, zum Beispiel aus Deutschlandfunk, ARD Audiothek, Apple Podcasts oder 
 
 Werden mehrere Audios gefunden, fragt die App, welches gespielt werden soll.
 
+## Podcasts (z. B. Kakadu) der Reihe nach hören
+
+Im Tab **Podcasts**:
+
+1. Suche nach dem Namen, z. B. „Kakadu“, oder füge einen Link zur Sendung ein. Tippe auf das Ergebnis, um den Podcast
+   hinzuzufügen.
+2. Die Folgen kommen direkt aus dem Podcast-Feed. Standardmäßig steht die älteste zuerst, und nur ungehörte Folgen
+   werden angezeigt. Beides lässt sich umschalten.
+3. **„Nächste ungehörte Folge abspielen“** oder das Antippen einer Folge legt diese und die folgenden Folgen (bis zu 20)
+   in die **Sonos-Warteschlange** des Raums. Sonos spielt sie dann von selbst nacheinander, auch wenn das Handy aus ist.
+4. Gespielte Folgen werden automatisch abgehakt, sobald die App sieht, dass Sonos sie spielt oder gespielt hat. Mit dem
+   Kreis links kannst du Folgen auch von Hand abhaken.
+
+Hinweise:
+- Die App ersetzt dabei die bisherige Sonos-Warteschlange dieses Raums.
+- Die App zeigt alles, was der Sender im Feed anbietet. Folgen, die nicht mehr im Feed stehen, kennt sie nicht.
+- „Gehört“ bedeutet: Die Folge wurde gestartet. Ob sie bis zum Ende lief, sieht die App nicht.
+
+## Weitere Funktionen
+
 In der App selbst gibt es außerdem:
 
 - die Raumauswahl mit allen Sonos-Gruppen; Befehle gehen automatisch an den Gruppenkoordinator

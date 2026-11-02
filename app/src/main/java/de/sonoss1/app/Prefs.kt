@@ -2,6 +2,7 @@ package de.sonoss1.app
 
 import android.content.Context
 import de.sonoss1.core.PlayableItem
+import de.sonoss1.core.Podcast
 import de.sonoss1.core.StreamKind
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -78,6 +79,58 @@ class Prefs(context: Context) {
         })
         sp.edit().putString("history", json.toString()).apply()
     }
+
+    var podcasts: List<Podcast>
+        get() = runCatching {
+            Json.parseToJsonElement(sp.getString("podcasts", "[]").orEmpty()).jsonArray.mapNotNull { element ->
+                val o = element.jsonObject
+                Podcast(
+                    feedUrl = o.str("feed") ?: return@mapNotNull null,
+                    title = o.str("title") ?: return@mapNotNull null,
+                    author = o.str("author"),
+                    artUrl = o.str("art"),
+                )
+            }
+        }.getOrDefault(emptyList())
+        set(value) {
+            val json = JsonArray(value.map {
+                buildJsonObject {
+                    put("feed", it.feedUrl)
+                    put("title", it.title)
+                    put("author", it.author)
+                    put("art", it.artUrl)
+                }
+            })
+            sp.edit().putString("podcasts", json.toString()).apply()
+        }
+
+    /** Ids of the episodes of [feedUrl] that were (at least partly) played. */
+    fun heard(feedUrl: String): Set<String> = stringSet("heard:$feedUrl")
+
+    fun setHeard(feedUrl: String, ids: Set<String>) = putStringSet("heard:$feedUrl", ids)
+
+    /** The episodes last put into the Sonos queue, to tick them off while Sonos plays them. */
+    var queueFeed: String?
+        get() = sp.getString("queue_feed", null)
+        set(value) = sp.edit().putString("queue_feed", value).apply()
+
+    var queueIds: List<String>
+        get() = stringList("queue_ids")
+        set(value) = putStringList("queue_ids", value)
+
+    var queueUrls: List<String>
+        get() = stringList("queue_urls")
+        set(value) = putStringList("queue_urls", value)
+
+    private fun stringList(key: String): List<String> = runCatching {
+        Json.parseToJsonElement(sp.getString(key, "[]").orEmpty()).jsonArray.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+    }.getOrDefault(emptyList())
+
+    private fun putStringList(key: String, value: List<String>) =
+        sp.edit().putString(key, JsonArray(value.map { JsonPrimitive(it) }).toString()).apply()
+
+    private fun stringSet(key: String) = stringList(key).toSet()
+    private fun putStringSet(key: String, value: Set<String>) = putStringList(key, value.toList())
 
     private fun JsonObject.str(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
 

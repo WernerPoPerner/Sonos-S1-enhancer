@@ -26,6 +26,12 @@ data class SonosGroup(val id: String, val coordinator: SonosPlayer, val members:
             .map { it.name }.distinct().joinToString(" + ")
 }
 
-data class NowPlaying(val state: String, val title: String?, val detail: String?) {
+data class NowPlaying(
+    val state: String,
+    val title: String?,
+    val detail: String?,
+    /** URI of the current track as Sonos reports it (e.g. a podcast episode's audio URL). */
+    val trackUri: String? = null,
+) {
     val isPlaying: Boolean get() = state == "PLAYING" || state == "TRANSITIONING"
 }

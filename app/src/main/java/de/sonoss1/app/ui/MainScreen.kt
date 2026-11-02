@@ -1,5 +1,6 @@
 package de.sonoss1.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,13 +18,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Podcasts
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speaker
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -35,6 +39,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -48,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -61,52 +68,80 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.sonoss1.app.MainUiState
 import de.sonoss1.app.MainViewModel
+import de.sonoss1.app.PodcastViewModel
 import de.sonoss1.core.PlayableItem
 import de.sonoss1.core.Stations
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(vm: MainViewModel) {
+fun MainScreen(vm: MainViewModel, podcastVm: PodcastViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val podcastState by podcastVm.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var confirmUnsubscribe by remember { mutableStateOf(false) }
+    var tab by rememberSaveable { mutableIntStateOf(TAB_PLAYER) }
 
     LaunchedEffect(Unit) {
         vm.messages.collect { snackbar.showSnackbar(it) }
     }
+    LaunchedEffect(Unit) {
+        podcastVm.messages.collect { snackbar.showSnackbar(it) }
+    }
+
+    val openPodcast = podcastState.open.takeIf { tab == TAB_PODCASTS }
+    BackHandler(enabled = openPodcast != null) { podcastVm.close() }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("S1 Player") },
+                title = {
+                    Text(
+                        openPodcast?.title ?: if (tab == TAB_PLAYER) "S1 Player" else "Podcasts",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                navigationIcon = {
+                    if (openPodcast != null) {
+                        IconButton(onClick = podcastVm::close) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") }
+                    }
+                },
                 actions = {
-                    IconButton(onClick = vm::refresh) { Icon(Icons.Filled.Refresh, "Lautsprecher suchen") }
-                    IconButton(onClick = { showSettings = true }) { Icon(Icons.Filled.Settings, "Einstellungen") }
+                    if (openPodcast != null) {
+                        IconButton(onClick = { podcastVm.open(openPodcast, forceReload = true) }) {
+                            Icon(Icons.Filled.Refresh, "Folgen neu laden")
+                        }
+                        IconButton(onClick = { confirmUnsubscribe = true }) { Icon(Icons.Filled.Delete, "Podcast entfernen") }
+                    } else {
+                        IconButton(onClick = vm::refresh) { Icon(Icons.Filled.Refresh, "Lautsprecher suchen") }
+                        IconButton(onClick = { showSettings = true }) { Icon(Icons.Filled.Settings, "Einstellungen") }
+                    }
                 },
             )
         },
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = tab == TAB_PLAYER,
+                    onClick = { tab = TAB_PLAYER },
+                    icon = { Icon(Icons.Filled.Speaker, contentDescription = null) },
+                    label = { Text("Player") },
+                )
+                NavigationBarItem(
+                    selected = tab == TAB_PODCASTS,
+                    onClick = { tab = TAB_PODCASTS },
+                    icon = { Icon(Icons.Filled.Podcasts, contentDescription = null) },
+                    label = { Text("Podcasts") },
+                )
+            }
+        },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item { RoomSection(state, vm) }
-            item { NowPlayingCard(state, vm) }
-            item { LinkInput(busy = state.busy, onPlay = vm::playLink) }
-            item { SectionTitle("Sender") }
-            items(Stations.all, key = { "station:" + it.streamUrl }) { station ->
-                val item = station.toItem()
-                PlayableRow(item, onClick = { vm.play(item) })
-            }
-            if (state.history.isNotEmpty()) {
-                item { SectionTitle("Zuletzt gespielt") }
-                items(state.history, key = { "history:" + it.url }) { item ->
-                    PlayableRow(item, onClick = { vm.play(item) }, onDelete = { vm.removeFromHistory(item) })
-                }
-            }
-            item { HelpCard() }
+        if (tab == TAB_PLAYER) {
+            PlayerTab(state, vm, Modifier.padding(padding))
+        } else {
+            PodcastsTab(podcastState, podcastVm, state, vm, Modifier.padding(padding))
         }
     }
 
@@ -123,10 +158,52 @@ fun MainScreen(vm: MainViewModel) {
             onDismiss = { showSettings = false },
         )
     }
+    if (confirmUnsubscribe && openPodcast != null) {
+        AlertDialog(
+            onDismissRequest = { confirmUnsubscribe = false },
+            title = { Text("Podcast entfernen?") },
+            text = { Text("»${openPodcast.title}« wird aus deiner Liste entfernt. Die Gehört-Markierungen bleiben erhalten.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmUnsubscribe = false
+                    podcastVm.unsubscribe(openPodcast)
+                }) { Text("Entfernen") }
+            },
+            dismissButton = { TextButton(onClick = { confirmUnsubscribe = false }) { Text("Abbrechen") } },
+        )
+    }
+}
+
+private const val TAB_PLAYER = 0
+private const val TAB_PODCASTS = 1
+
+@Composable
+private fun PlayerTab(state: MainUiState, vm: MainViewModel, modifier: Modifier) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item { RoomSection(state, vm) }
+        item { NowPlayingCard(state, vm) }
+        item { LinkInput(busy = state.busy, onPlay = vm::playLink) }
+        item { SectionTitle("Sender") }
+        items(Stations.all, key = { "station:" + it.streamUrl }) { station ->
+            val item = station.toItem()
+            PlayableRow(item, onClick = { vm.play(item) })
+        }
+        if (state.history.isNotEmpty()) {
+            item { SectionTitle("Zuletzt gespielt") }
+            items(state.history, key = { "history:" + it.url }) { item ->
+                PlayableRow(item, onClick = { vm.play(item) }, onDelete = { vm.removeFromHistory(item) })
+            }
+        }
+        item { HelpCard() }
+    }
 }
 
 @Composable
-private fun RoomSection(state: MainUiState, vm: MainViewModel) {
+internal fun RoomSection(state: MainUiState, vm: MainViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle("Raum")
         when {
@@ -233,7 +310,7 @@ private fun PlayableRow(item: PlayableItem, onClick: () -> Unit, onDelete: (() -
 }
 
 @Composable
-private fun SectionTitle(text: String) {
+internal fun SectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
 }
 

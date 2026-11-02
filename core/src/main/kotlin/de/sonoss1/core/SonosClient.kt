@@ -19,6 +19,36 @@ class SonosClient(private val http: HttpFetcher) {
         resume(group)
     }
 
+    /**
+     * Replaces the room's Sonos queue with [items] and starts at the first one. Sonos then plays
+     * them one after another on its own – the phone can be switched off.
+     */
+    fun playQueue(group: SonosGroup, items: List<PlayableItem>, forceHttp: Boolean = false) {
+        require(items.isNotEmpty())
+        val player = group.coordinator
+        soap(player, AV_TRANSPORT, "RemoveAllTracksFromQueue", "InstanceID" to "0")
+        for (item in items) {
+            soap(
+                player, AV_TRANSPORT, "AddURIToQueue",
+                "InstanceID" to "0",
+                "EnqueuedURI" to transportUri(item, forceHttp),
+                "EnqueuedURIMetaData" to didl(item),
+                "DesiredFirstTrackNumberEnqueued" to "0",
+                "EnqueueAsNext" to "0",
+            )
+        }
+        soap(
+            player, AV_TRANSPORT, "SetAVTransportURI",
+            "InstanceID" to "0",
+            "CurrentURI" to "x-rincon-queue:${player.uuid}#0",
+            "CurrentURIMetaData" to "",
+        )
+        // A shuffled or repeating play mode left over from the Sonos app would mix up the order.
+        runCatching { soap(player, AV_TRANSPORT, "SetPlayMode", "InstanceID" to "0", "NewPlayMode" to "NORMAL") }
+        soap(player, AV_TRANSPORT, "Seek", "InstanceID" to "0", "Unit" to "TRACK_NR", "Target" to "1")
+        resume(group)
+    }
+
     fun resume(group: SonosGroup) {
         soap(group.coordinator, AV_TRANSPORT, "Play", "InstanceID" to "0", "Speed" to "1")
     }
@@ -49,7 +79,8 @@ class SonosClient(private val http: HttpFetcher) {
         val creator = Xml.tag(trackMeta, "creator")?.takeIf { it.isNotBlank() }
         val title = stationTitle?.takeIf { it.isNotBlank() } ?: trackTitle
         val detail = streamContent ?: creator ?: trackTitle?.takeIf { it != title }
-        return NowPlaying(state, title, detail)
+        val trackUri = Xml.tag(position, "TrackURI")?.takeIf { it.isNotBlank() }
+        return NowPlaying(state, title, detail, trackUri)
     }
 
     fun volume(group: SonosGroup): Int {
