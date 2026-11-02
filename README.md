@@ -67,8 +67,11 @@ Die APK baut GitHub Actions bei jedem Push:
 
 Voraussetzungen: Android 8 oder neuer. Das Handy muss im selben WLAN sein wie das Sonos-System.
 
-> Die APK ist mit einem Debug-Schlüssel signiert, den CI bei jedem Lauf neu erzeugt. Lässt sich ein
-> Update nicht installieren, deinstalliere die alte Version vorher.
+> **Updates ohne Datenverlust:** Sind im Repository unter *Settings → Secrets and variables → Actions* die
+> Secrets `SIGNING_KEYSTORE_BASE64` (der Signierschlüssel, Base64-kodiert) und `SIGNING_PASSWORD` hinterlegt,
+> signiert CI jede APK mit demselben Schlüssel. Neue Versionen installieren sich dann als Update, und Podcasts
+> sowie Gehört-Markierungen bleiben erhalten. Fehlen die Secrets, nutzt CI einen wechselnden Debug-Schlüssel;
+> dann muss die alte Version vor einem Update deinstalliert werden.
 
 Selbst bauen (Android SDK nötig): `./gradlew :app:assembleRelease`
 

@@ -21,7 +21,20 @@ jobs:
       - name: Unit tests (core)
         run: ./gradlew :core:test --no-daemon
 
+      - name: Decode signing key
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/s1player.keystore"
+            echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/s1player.keystore" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Secret SIGNING_KEYSTORE_BASE64 fehlt – APK wird mit wechselndem Debug-Schlüssel signiert."
+          fi
+
       - name: Build APK
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
         run: ./gradlew :app:assembleRelease --no-daemon
 
       - name: Upload APK

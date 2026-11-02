@@ -16,11 +16,25 @@ android {
         versionName = "1.1"
     }
 
+    // CI decodes the private key from the GitHub secrets SIGNING_KEYSTORE_BASE64 / SIGNING_PASSWORD.
+    // A fixed key lets every new APK install as an update and keep the app's data.
+    val keystorePath = System.getenv("SIGNING_KEYSTORE_PATH")
+    if (keystorePath != null) {
+        signingConfigs {
+            create("sideload") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("SIGNING_PASSWORD")
+                keyAlias = "s1player"
+                keyPassword = System.getenv("SIGNING_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Signed with the debug key so the APK from CI can be installed directly.
-            signingConfig = signingConfigs.getByName("debug")
+            // Without the secrets (e.g. a local build) fall back to the debug key.
+            signingConfig = signingConfigs.getByName(if (keystorePath != null) "sideload" else "debug")
         }
     }
 
